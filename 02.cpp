@@ -27,7 +27,15 @@ enum Operation
   Delete = 3,
   Update = 4,
   Find = 5,
-  Exit = 6,
+  Transactions = 6,
+  Exit = 7,
+};
+enum Transactions
+{
+  Deposit = 1,
+  withdraw = 2,
+  TotalBalances = 3,
+  MainMenu = 4,
 };
 string readString(string message)
 {
@@ -55,6 +63,13 @@ void goToMainScreen()
   cout << "press any key to back to main menu..." << endl;
   system("pause>0");
   showMainScreen();
+}
+void transactionsScreen();
+void goToTransactionsScreen()
+{
+  cout << "press any key to back to Transactions screen..." << endl;
+  system("pause>0");
+  transactionsScreen();
 }
 string clientToLine(sClient client, string delimter)
 {
@@ -155,6 +170,13 @@ void printClientsHeader(int count)
   cout << "| Account Number  | Pin code  | Client Name       | Phone       | Balance  ";
   cout << "\n===========================================================================" << endl;
 }
+void printClientsBalanceHeader(int count)
+{
+  cout << "                     client list (" << count << ") client(s)                   " << endl;
+  cout << "===========================================================" << endl;
+  cout << "| Account Number  | Client Name             | Balance  ";
+  cout << "\n===========================================================" << endl;
+}
 void printClient(sClient client)
 {
   cout << "| " << left << setw(16) << client.AccountNumber;
@@ -164,14 +186,24 @@ void printClient(sClient client)
   cout << "| " << left << setw(9) << client.AccountBalance << "\n";
   cout << "---------------------------------------------------------------------------" << endl;
 }
-void showClientsData(vector<sClient> clients)
+void printClientBalance(sClient client)
 {
-
-  printClientsHeader(clients.size());
+  cout << "| " << left << setw(16) << client.AccountNumber;
+  cout << "| " << left << setw(24) << client.Name;
+  cout << "| " << left << setw(9) << client.AccountBalance << "\n";
+  cout << "----------------------------------------------------------" << endl;
+}
+void showClientsData(vector<sClient> clients, bool isBalanceData = false)
+{
+  int totalBalances = 0;
+  isBalanceData ? printClientsBalanceHeader(clients.size()) : printClientsHeader(clients.size());
   for (sClient &client : clients)
   {
-    printClient(client);
+    totalBalances += client.AccountBalance;
+    isBalanceData ? printClientBalance(client) : printClient(client);
   }
+  if (isBalanceData)
+    cout << "                     Total Balalances : " << totalBalances << endl;
 }
 bool findClientByAccountNumber(vector<sClient> clients, string AccountNumber, sClient &client)
 {
@@ -286,10 +318,60 @@ bool UpdateClientByAccountNumber(vector<sClient> &clients, string AccountNumber)
   }
   return false;
 }
-short readMainMenuOption()
+bool DepositOrWithdrawByAccountNumber(vector<sClient> &clients, string AccountNumber, bool isDeposit = true)
+{
+  sClient client;
+  char Answer = 'n';
+  if (findClientByAccountNumber(clients, AccountNumber, client))
+  {
+    printClientRecord(client);
+    int amount = 0;
+    cout << (isDeposit ? "\n\nPlease enter deposit amount ?" : "\n\nPlease enter withdraw amount ?");
+    cin >> amount;
+    while (amount > client.AccountBalance && !isDeposit)
+    {
+      cout << "\nAmount exceeds the balance you can withdraw up to : " << (client.AccountBalance) << endl;
+      cout << "\n\nPlease enter withdraw amount ?";
+      cin >> amount;
+    }
+    cout << "\n\nAre you sure you want perform this this transaction? [y/n]";
+    cin >> Answer;
+    if (Answer == 'y' || Answer == 'Y')
+    {
+      for (sClient &client : clients)
+      {
+        if (client.AccountNumber == AccountNumber)
+        {
+          if (isDeposit)
+          {
+            client.AccountBalance += amount;
+            break;
+          }
+          else
+          {
+            client.AccountBalance -= amount;
+          }
+        }
+      }
+      SaveClientsDataToFile(FileName, clients);
+      cout << "\n\nClient update successfully";
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+  else
+  {
+    cout << "The client with account number (" << AccountNumber << ") not found.";
+  }
+  return false;
+}
+short readOption(string fromTo)
 {
   short op = 0;
-  cout << "Choose what do you want to do? [1 to 6]:";
+  cout << "Choose what do you want to do? [" + fromTo + "]:";
   cin >> op;
   return op;
 }
@@ -323,9 +405,63 @@ void updateClientScreen()
   cout << "======================================" << endl;
   UpdateClientByAccountNumber(clients, ReadAccountNumber());
 }
+void depositScreen()
+{
+  cout << "======================================" << endl;
+  cout << "             Deposit screen           " << endl;
+  cout << "======================================" << endl;
+  DepositOrWithdrawByAccountNumber(clients, ReadAccountNumber());
+};
+void withdrawScreen()
+{
+  cout << "======================================" << endl;
+  cout << "            Withdraw screen           " << endl;
+  cout << "======================================" << endl;
+  DepositOrWithdrawByAccountNumber(clients, ReadAccountNumber(), false);
+};
+void totalBalancesScreen()
+{
+  showClientsData(clients, true);
+};
+void manageTransactionsScreens(vector<sClient> &clients, short operationKey)
+{
+  switch (operationKey)
+  {
+  case Transactions::Deposit:
+    system("cls");
+    depositScreen();
+    goToTransactionsScreen();
+    break;
+  case Transactions::withdraw:
+    system("cls");
+    withdrawScreen();
+    goToTransactionsScreen();
+    break;
+  case Transactions::TotalBalances:
+    system("cls");
+    totalBalancesScreen();
+    goToTransactionsScreen();
+    break;
+  default:
+    showMainScreen();
+    break;
+  }
+}
+void transactionsScreen()
+{
+  system("cls");
+  cout << "======================================" << endl;
+  cout << "           Transactions screen        " << endl;
+  cout << "======================================" << endl;
+  cout << "\t [1] Deposit. " << endl;
+  cout << "\t [2] withdraw. " << endl;
+  cout << "\t [3] Total Balances.  " << endl;
+  cout << "\t [4] Main menu. " << endl;
+  cout << "======================================" << endl;
+  manageTransactionsScreens(clients, readOption("1 to 4"));
+}
 void manageOperationScreens(vector<sClient> &clients, short operationKey)
 {
-
   switch (operationKey)
   {
   case Operation::ShowAll:
@@ -354,10 +490,16 @@ void manageOperationScreens(vector<sClient> &clients, short operationKey)
     deleteClientScreen();
     goToMainScreen();
     break;
+  case Operation::Transactions:
+    system("cls");
+    transactionsScreen();
+    goToMainScreen();
+    break;
   default:
     break;
   }
 }
+
 void showMainScreen()
 {
   system("cls");
@@ -369,9 +511,10 @@ void showMainScreen()
   cout << "\t [3] Delete client.  " << endl;
   cout << "\t [4] Update client info. " << endl;
   cout << "\t [5] Find client. " << endl;
-  cout << "\t [6] Exit. " << endl;
+  cout << "\t [6] Transactions. " << endl;
+  cout << "\t [7] Exit. " << endl;
   cout << "======================================" << endl;
-  manageOperationScreens(clients, readMainMenuOption());
+  manageOperationScreens(clients, readOption("1 to 7"));
 }
 
 void startApp()
